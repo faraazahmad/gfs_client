@@ -28,12 +28,26 @@ defmodule Gfs.Client do
       iex> Gfs.Client.write_file_from_local_fs(local_path, "severance/s02/ep01.mp4")
 
   """
-  def write_file_from_local_fs(local_path, _gfs_path) do
+  def write_file_from_local_fs(local_path, gfs_path, force \\ true) do
+    if String.length(gfs_path) == 0 do
+      raise "Empty GFS path not allowed."
+    end
+
     # Read 64KB chunks
     for_each_chunk(local_path, fn chunk, chunk_start_byte ->
         chunk_end_byte = chunk_start_byte + byte_size(chunk) - 1
 
-        IO.puts("start_byte: #{chunk_start_byte} -- end_byte: #{chunk_end_byte}")
+        request_payload = Poison.encode!(%{
+            content: :base64.encode(chunk),
+            start_byte: chunk_start_byte,
+            end_byte: chunk_end_byte,
+            force: force
+        })
+        HTTPoison.post!(
+            "http://localhost:4000/file/#{gfs_path}/chunk",
+            request_payload,
+            [{"Content-Type", "application/json"}]
+        )
     end)
   end
 
